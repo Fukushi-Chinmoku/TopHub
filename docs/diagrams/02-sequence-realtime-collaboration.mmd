@@ -1,0 +1,57 @@
+%% Codely — диаграмма последовательности совместного редактирования конспекта
+sequenceDiagram
+    autonumber
+    participant U1 as Клиент A<br/>(Vue + Yjs)
+    participant U2 as Клиент B<br/>(Vue + Yjs)
+    participant NG as Nginx
+    participant API as FastAPI<br/>WebSocket handler
+    participant Hub as CollaborationHub
+    participant RD as Redis<br/>pub/sub
+    participant PG as PostgreSQL
+
+    Note over U1,PG: Подключение к комнате конспекта
+
+    U1->>NG: WS /ws/notes/{note_id} + session cookie
+    NG->>API: Upgrade WebSocket
+    API->>PG: Проверка сессии и прав редактирования
+    PG-->>API: user, note
+    API->>Hub: connect(note_id, ws, user)
+    Hub->>U1: content_sync (content_yjs_base64, content_html)
+    Hub->>U1: presence (список участников)
+
+    U2->>NG: WS /ws/notes/{note_id} + session cookie
+    NG->>API: Upgrade WebSocket
+    API->>Hub: connect(note_id, ws, user)
+    Hub->>U1: presence (обновлённый список)
+    Hub->>U2: content_sync
+    Hub->>U2: presence
+
+    Note over U1,PG: Редактирование текста (CRDT-апдейты)
+
+    U1->>U1: TipTap генерирует yjs_update
+    U1->>NG: yjs_update + опционально content_yjs_base64
+    NG->>API: JSON-сообщение
+    API->>PG: update_note_yjs_content()
+    PG-->>API: updated_note
+    API->>Hub: broadcast(yjs_update) без отправителя
+    Hub->>U2: yjs_update
+    API->>Hub: publish_update → Redis
+    RD-->>Hub: сообщение другим инстансам API
+    API->>U1: content_saved
+
+    U2->>U2: Применение CRDT-апдейта в Yjs
+
+    Note over U1,PG: Awareness — курсоры и выделения
+
+    U1->>NG: awareness_update
+    NG->>API: awareness_update_base64
+    API->>Hub: broadcast(awareness_update)
+    Hub->>U2: awareness_update
+    API->>Hub: publish_update → Redis
+
+    Note over U1,PG: Отключение участника
+
+    U1--xNG: Закрытие вкладки / disconnect
+    API->>Hub: disconnect(note_id, ws)
+    Hub->>U2: awareness_remove (client_id)
+    Hub->>U2: presence (обновлённый список)

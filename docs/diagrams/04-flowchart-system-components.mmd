@@ -1,0 +1,82 @@
+%% Codely — блочная диаграмма компонентов и инфраструктуры (Top-Down)
+flowchart TD
+    subgraph Client["Клиентский уровень"]
+        Browser[Браузер пользователя]
+        Vue[Vue 3 SPA]
+        Router[Vue Router]
+        AuthState[Состояние auth.js]
+        ApiClient[HTTP-клиент api/client.js]
+        RichEditor[RichEditor: TipTap + Yjs + Collaboration]
+        Views[Views: Cabinet, Groups, Friends, Notes]
+
+        Browser --> Vue
+        Vue --> Router
+        Vue --> AuthState
+        Vue --> Views
+        Views --> ApiClient
+        Views --> RichEditor
+    end
+
+    subgraph Edge["Уровень reverse proxy"]
+        Nginx[Nginx :80]
+        Static[Статика frontend/dist]
+        ProxyAPI[Прокси /api/*]
+        ProxyWS[Прокси /ws/* WebSocket upgrade]
+
+        Nginx --> Static
+        Nginx --> ProxyAPI
+        Nginx --> ProxyWS
+    end
+
+    subgraph Backend["Серверный уровень — FastAPI"]
+        Main[app/main.py]
+        ApiRouter[API Router /api]
+        WSRouter[WebSocket Router /ws]
+
+        subgraph Routes["Маршруты"]
+            AuthR[auth]
+            NotesR[notes]
+            GroupsR[groups]
+            FriendsR[friends]
+            UsersR[users]
+            CabinetR[cabinet]
+            SubjectsR[subjects]
+            HealthR[health]
+        end
+
+        subgraph Services["Сервисный слой"]
+            AuthSvc[AuthService]
+            NoteSvc[NoteService]
+            GroupSvc[GroupService]
+            FriendSvc[FriendService]
+            UserSvc[UserService]
+            EngageSvc[EngagementService]
+            AccessPol[AccessPolicy]
+        end
+
+        subgraph Realtime["Realtime-слой"]
+            Hub[CollaborationHub]
+            RedisPub[Redis pub/sub каналы note:*]
+        end
+
+        Main --> ApiRouter
+        Main --> WSRouter
+        ApiRouter --> Routes
+        Routes --> Services
+        WSRouter --> Hub
+        Hub --> RedisPub
+        Services --> AccessPol
+    end
+
+    subgraph Data["Уровень данных"]
+        PG[(PostgreSQL 16)]
+        Redis[(Redis 7)]
+    end
+
+    ApiClient -->|HTTP REST| Nginx
+    RichEditor -->|WebSocket| Nginx
+    ProxyAPI --> ApiRouter
+    ProxyWS --> WSRouter
+    Services --> PG
+    Hub --> RedisPub
+    RedisPub --> Redis

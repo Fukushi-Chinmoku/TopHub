@@ -1,0 +1,121 @@
+%% Codely — ER-диаграмма базы данных PostgreSQL
+erDiagram
+    USERS {
+        uuid id PK
+        string login UK
+        string password_hash
+        string display_name
+        float rating_avg
+        int rating_count
+        datetime created_at
+    }
+
+    SESSIONS {
+        uuid id PK
+        uuid user_id FK
+        string token_hash UK
+        string user_agent
+        string ip_address
+        datetime created_at
+        datetime last_activity_at
+        datetime expires_at
+    }
+
+    GROUPS {
+        uuid id PK
+        string name UK
+        uuid owner_id FK
+        datetime created_at
+    }
+
+    GROUP_MEMBERSHIPS {
+        uuid id PK
+        uuid group_id FK
+        uuid user_id FK
+        string role
+        string status
+        datetime created_at
+    }
+
+    FRIENDSHIPS {
+        uuid id PK
+        uuid requester_id FK
+        uuid addressee_id FK
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    SUBJECTS {
+        uuid id PK
+        string name UK
+        datetime created_at
+    }
+
+    NOTES {
+        uuid id PK
+        uuid owner_id FK
+        string title
+        string description
+        json outline
+        uuid subject_id FK
+        string subject_custom
+        string visibility
+        uuid group_id FK
+        bool is_published
+        bytes content_yjs
+        text content_html
+        float rating_avg
+        int rating_count
+        datetime created_at
+        datetime updated_at
+    }
+
+    NOTE_TAGS {
+        uuid id PK
+        uuid note_id FK
+        string tag
+        datetime created_at
+    }
+
+    NOTE_COMMENTS {
+        uuid id PK
+        uuid note_id FK
+        uuid user_id FK
+        text content
+        datetime created_at
+    }
+
+    NOTE_RATINGS {
+        uuid id PK
+        uuid note_id FK
+        uuid user_id FK
+        int score
+        datetime created_at
+        datetime updated_at
+    }
+
+    NOTE_REVISIONS {
+        uuid id PK
+        uuid note_id FK
+        uuid author_id FK
+        text content_html
+        datetime created_at
+    }
+
+    USERS ||--o{ SESSIONS : "имеет"
+    USERS ||--o{ GROUPS : "владеет"
+    USERS ||--o{ GROUP_MEMBERSHIPS : "участвует"
+    GROUPS ||--o{ GROUP_MEMBERSHIPS : "содержит"
+    USERS ||--o{ FRIENDSHIPS : "отправляет"
+    USERS ||--o{ FRIENDSHIPS : "получает"
+    USERS ||--o{ NOTES : "создаёт"
+    SUBJECTS ||--o{ NOTES : "категоризирует"
+    GROUPS ||--o{ NOTES : "групповые"
+    NOTES ||--o{ NOTE_TAGS : "имеет"
+    NOTES ||--o{ NOTE_COMMENTS : "имеет"
+    USERS ||--o{ NOTE_COMMENTS : "пишет"
+    NOTES ||--o{ NOTE_RATINGS : "оценивается"
+    USERS ||--o{ NOTE_RATINGS : "ставит"
+    NOTES ||--o{ NOTE_REVISIONS : "версионируется"
+    USERS ||--o{ NOTE_REVISIONS : "автор"

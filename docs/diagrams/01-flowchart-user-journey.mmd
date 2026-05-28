@@ -1,0 +1,65 @@
+%% Codely — блочная диаграмма пользовательского сценария (Top-Down)
+flowchart TD
+    Start([Пользователь открывает приложение]) --> CheckAuth{Авторизован?}
+
+    CheckAuth -->|Нет| LoginPage[Страница входа /login]
+    LoginPage --> AuthChoice{Регистрация или вход?}
+
+    AuthChoice -->|Регистрация| Register[POST /api/auth/register]
+    AuthChoice -->|Вход| Login[POST /api/auth/login]
+
+    Register --> ValidateReg{Валидация логина и пароля}
+    ValidateReg -->|Ошибка| LoginPage
+    ValidateReg -->|OK| CreateUser[Создание пользователя в PostgreSQL]
+    CreateUser --> Cabinet
+
+    Login --> ValidateLogin{Проверка учётных данных}
+    ValidateLogin -->|Ошибка| LoginPage
+    ValidateLogin -->|OK| SetCookie[Установка session cookie]
+    SetCookie --> Cabinet[Личный кабинет /cabinet]
+
+    CheckAuth -->|Да| Cabinet
+
+    Cabinet --> Action{Действие пользователя}
+
+    Action -->|Создать конспект| Wizard[Мастер создания /notes/new]
+    Wizard --> FillMeta[Заполнение метаданных: название, предмет, теги]
+    FillMeta --> CreateNote[POST /api/notes]
+    CreateNote --> NoteDetail[Редактор конспекта /notes/:id]
+
+    Action -->|Открыть конспект| NoteDetail
+    Action -->|Группы| Groups[Страница групп /groups]
+    Action -->|Друзья| Friends[Страница друзей /friends]
+    Action -->|Профиль другого| UserNotes[Конспекты пользователя /users/:login]
+
+    Groups --> GroupFlow{Операция с группой}
+    GroupFlow -->|Создать| CreateGroup[POST /api/groups]
+    GroupFlow -->|Подать заявку| JoinRequest[POST /api/groups/join-request]
+    GroupFlow -->|Принять заявку| ApproveRequest[PATCH /api/groups/.../requests/...]
+
+    Friends --> FriendFlow{Операция с друзьями}
+    FriendFlow -->|Отправить заявку| FriendRequest[POST /api/friends/request]
+    FriendFlow -->|Принять заявку| AcceptFriend[PATCH /api/friends/requests/...]
+
+    NoteDetail --> OpenWS[WebSocket WS /ws/notes/:id]
+    OpenWS --> RealtimeEdit[Совместное редактирование Yjs + TipTap]
+    RealtimeEdit --> SyncOthers[Синхронизация через Redis pub/sub]
+    SyncOthers --> SaveDB[Периодическое сохранение content_yjs и content_html]
+
+    NoteDetail --> PublishChoice{Опубликовать?}
+    PublishChoice -->|Да| Publish[POST /api/notes/:id/publish]
+    PublishChoice -->|Нет| Engagement
+
+    Publish --> Engagement[Комментарии и оценки]
+    Engagement --> Comment[POST /api/notes/:id/comments]
+    Engagement --> Rate[PUT /api/notes/:id/rating]
+    Engagement --> Revision[POST /api/notes/:id/revisions]
+
+    Revision --> Restore{Восстановить версию?}
+    Restore -->|Да| RestoreRev[POST .../revisions/:id/restore]
+    Restore -->|Нет| End([Завершение работы])
+    RestoreRev --> NoteDetail
+
+    Comment --> End
+    Rate --> End
+    SaveDB --> End
